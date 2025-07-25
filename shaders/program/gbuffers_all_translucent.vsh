@@ -49,8 +49,7 @@ attribute vec2 mc_midTexCoord;
 
 uniform sampler2D noisetex;
 
-uniform sampler2D colortex4; // Sky map, lighting colors
-uniform sampler2D colortex9; // Sky SH
+uniform sampler2D colortex4; // Sky map, lighting colors, sky SH
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
@@ -102,7 +101,7 @@ uniform float time_midnight;
 
 uniform float desert_sandstorm;
 
-#if defined PROGRAM_GBUFFERS_ENTITIES_TRANSLUCENT
+#if defined PROGRAM_GBUFFERS_ENTITIES_TRANSLUCENT || defined PROGRAM_GBUFFERS_LIGHTNING
 uniform int entityId;
 #endif
 
@@ -114,6 +113,7 @@ uniform int blockEntityId;
 uniform int currentRenderedItemId;
 #endif
 
+#include "/include/misc/material_masks.glsl"
 #include "/include/utility/space_conversion.glsl"
 #include "/include/vertex/displacement.glsl"
 #include "/include/vertex/utility.glsl"
@@ -123,7 +123,7 @@ uniform int currentRenderedItemId;
 #endif
 
 void main() {
-	uv            = mat2(gl_TextureMatrix[0]) * gl_MultiTexCoord0.xy + gl_TextureMatrix[0][3].xy;
+	uv            = mat2(gl_TextureMatrix[0]) * gl_MultiTexCoord0.xy + gl_TextureMatrix[0][3].xy;  // Faster method breaks on Intel for some reason, thanks to ilux-git for finding this!
 	light_levels  = clamp01(gl_MultiTexCoord1.xy * rcp(240.0));
 	tint          = gl_Color;
 	material_mask = get_material_mask();
@@ -131,7 +131,7 @@ void main() {
 
 	light_color   = texelFetch(colortex4, ivec2(191, 0), 0).rgb;
 #if defined WORLD_OVERWORLD && defined SH_SKYLIGHT
-	ambient_color = texelFetch(colortex9, ivec2(9, 0), 0).rgb;
+	ambient_color = texelFetch(colortex4, ivec2(191, 11), 0).rgb;
 #else
 	ambient_color = texelFetch(colortex4, ivec2(191, 1), 0).rgb;
 #endif
@@ -156,6 +156,23 @@ void main() {
 		atlas_tile_offset = min(uv, mc_midTexCoord - uv_minus_mid);
 		atlas_tile_scale = abs(uv_minus_mid) * 2.0;
 		atlas_tile_coord = sign(uv_minus_mid) * 0.5 + 0.5;
+	}
+#endif
+
+#if defined PROGRAM_GBUFFERS_LIGHTNING && defined WORLD_END
+	// For some reason the Ender Dragon death beams also use gbuffers_lightning
+
+	// Ender Dragon death beam check from Euphoria Patches by SpacEagle17, used with permission
+	// https://www.euphoriapatches.com/
+	bool is_dragon_death_beam = entityId == 0 && (tint.a < 0.2 || tint.a == 1.0);
+
+	if (is_dragon_death_beam) {
+		material_mask = MATERIAL_DRAGON_BEAM;
+
+		if (tint.r < 0.2) {
+			// Dark bit at the end
+			tint.a = 0.0;
+		}
 	}
 #endif
 

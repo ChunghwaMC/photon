@@ -19,8 +19,6 @@ flat out vec3 light_color;
 #if defined WORLD_OVERWORLD
 #include "/include/fog/overworld/parameters.glsl"
 flat out OverworldFogParameters fog_params;
-
-flat out float rainbow_amount;
 #endif
 
 // ------------
@@ -28,7 +26,6 @@ flat out float rainbow_amount;
 // ------------
 
 uniform sampler2D colortex4; // Sky map, lighting color palette
-uniform sampler2D colortex9; // Sky SH
 
 uniform float rainStrength;
 uniform float sunAngle;
@@ -63,7 +60,6 @@ uniform float desert_sandstorm;
 
 #if defined WORLD_OVERWORLD
 #include "/include/weather/fog.glsl"
-#include "/include/weather/rainbow.glsl"
 #endif
 
 void main() {
@@ -71,16 +67,13 @@ void main() {
 
 	light_color   = texelFetch(colortex4, ivec2(191, 0), 0).rgb;
 #if defined WORLD_OVERWORLD && defined SH_SKYLIGHT
-	ambient_color = texelFetch(colortex9, ivec2(9, 0), 0).rgb;
+	ambient_color = texelFetch(colortex4, ivec2(191, 11), 0).rgb;
 #else
 	ambient_color = texelFetch(colortex4, ivec2(191, 1), 0).rgb;
 #endif
 
 #if defined WORLD_OVERWORLD
-	Weather weather = get_weather();
-
-	fog_params = get_fog_parameters(weather);
-	rainbow_amount = get_rainbow_amount(weather);
+	fog_params = get_fog_parameters(get_weather());
 #endif
 
 	vec2 vertex_pos = gl_Vertex.xy * taau_render_scale;
